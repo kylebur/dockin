@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newcastle Dock Schedule Planner</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        /* Basic styling for the application */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+            line-height: 1.6;
+            padding: 20px;
+            background-color: #f4f7f9; /* Light background */
+            color: #333;
+            margin: 0;
+        }
+        .container {
+            max-width: 950px; /* Slightly wider for better chart display */
+            margin: 20px auto; /* Add top/bottom margin */
+            background: #ffffff; /* White background for content */
+            padding: 25px 30px; /* Adjust padding */
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); /* Softer shadow */
+            border: 1px solid #e0e0e0; /* Subtle border */
+        }
+        h1, h2 {
+            color: #1a5f9a; /* Darker blue */
+            border-bottom: 2px solid #eef2f5; /* Lighter border */
+            padding-bottom: 8px;
+            margin-top: 0; /* Remove default top margin for first h1 */
+            margin-bottom: 20px; /* Increase spacing below headers */
+        }
+        h1 {
+            text-align: center; /* Center main title */
+            margin-bottom: 30px;
+        }
+        #chartContainer {
+            margin-bottom: 35px; /* More space after chart */
+            position: relative; /* Needed for loader and canvas positioning */
+            height: 33vh; /* Set height to 1/3rd of the viewport height */
+            background-color: #fdfdfd; /* Very light background for chart area */
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e8e8e8;
+        }
+        /* Ensure canvas scales within the container */
+        #chartContainer canvas {
+             max-width: 100%;
+             max-height: 100%;
+        }
+        #suitableDates ul {
+            list-style: none;
+            padding: 0;
+        }
+        #suitableDates li {
+            background-color: #e8f4fd; /* Lighter blue background */
+            margin-bottom: 12px; /* More spacing */
+            padding: 12px 18px;
+            border-radius: 6px;
+            border: 1px solid #c1dff7; /* Slightly darker border */
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease; /* Smooth hover effect */
+        }
+        #suitableDates li:hover {
+            background-color: #d6ebfa; /* Slightly darker on hover */
+        }
+        #suitableDates button {
+            padding: 6px 12px;
+            cursor: pointer;
+            background-color: #007bff; /* Standard blue */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: background-color 0.2s ease, transform 0.1s ease; /* Add transitions */
+        }
+        #suitableDates button:hover {
+            background-color: #0056b3; /* Darker blue on hover */
+            transform: translateY(-1px); /* Slight lift effect */
+        }
+         #suitableDates button:active {
+             transform: translateY(0px); /* Press effect */
+         }
+        #scheduleOutput {
+            margin-top: 25px;
+            background-color: #f9f9f9; /* Light grey background */
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0; /* Consistent border */
+        }
+        #scheduleOutput h3 {
+            margin-top: 0;
+            color: #444; /* Dark grey header */
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        /* Style for the calendar download link */
+        #calendarLinkContainer {
+            margin-bottom: 15px; /* Space below the link */
+            text-align: left; /* Align link to the left */
+        }
+        #calendarLink {
+            display: inline-block;
+            padding: 8px 15px;
+            background-color: #28a745; /* Green color */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 0.95em;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        #calendarLink:hover {
+            background-color: #218838; /* Darker green on hover */
+        }
+        #scheduleOutput ul {
+            list-style: none;
+            padding: 0;
+        }
+        #scheduleOutput li {
+            padding: 8px 5px; /* Add some horizontal padding */
+            border-bottom: 1px dashed #dcdcdc; /* Dashed separator */
+            display: flex; /* Use flexbox for alignment */
+            align-items: center;
+        }
+        #scheduleOutput li:last-child {
+            border-bottom: none;
+        }
+        #scheduleOutput strong {
+            display: inline-block;
+            min-width: 210px; /* Wider width for formatted time */
+            color: #0056b3; /* Match button color */
+            font-weight: 500; /* Slightly bolder */
+            margin-right: 10px; /* Space between time and action */
+        }
+        /* Status messages (loading, error, info) */
+        .status-message {
+            text-align: center;
+            padding: 25px;
+            margin: 20px 0;
+            font-size: 1.1em;
+            color: #555;
+            background-color: #f0f0f0;
+            border-radius: 6px;
+            border: 1px solid #dcdcdc;
+        }
+        .status-message.error {
+            color: #a94442; /* Red for errors */
+            background-color: #f2dede;
+            border-color: #ebccd1;
+        }
+        .status-message.info {
+             color: #31708f; /* Blue for info */
+             background-color: #d9edf7;
+             border-color: #bce8f1;
+        }
+        /* Simple CSS loader */
+        .loader::after {
+            content: ' .';
+            animation: dots 1.2s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { color: rgba(0,0,0,0); text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
+            40% { color: #555; text-shadow: .25em 0 0 rgba(0,0,0,0), .5em 0 0 rgba(0,0,0,0);}
+            60% { text-shadow: .25em 0 0 #555, .5em 0 0 rgba(0,0,0,0);}
+            80%, 100% { text-shadow: .25em 0 0 #555, .5em 0 0 #555;}
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Newcastle Dock Schedule Planner</h1>
+
+        <div id="status" class="status-message loader">Loading tide data...</div>
+
+        <div id="chartContainer" style="display: none;">
+            <h2>Tide Predictions (Next 30 Days)</h2>
+            <canvas id="tideChart"></canvas>
+        </div>
+
+        <div id="suitableDates" style="display: none;">
+             <h2 id="suitableDatesTitle">Suitable High Tides</h2>
+            <ul id="datesList">
+                </ul>
+        </div>
+
+        <div id="scheduleOutput" style="display: none;">
+            <div id="calendarLinkContainer"></div>
+            <ul id="scheduleList">
+                </ul>
+        </div>
+    </div>
+
+    <script>
+        // --- Configuration ---
+        const TIDE_STATION_ID = '8415709'; // Damariscotta River, ME (near Newcastle)
+        const MIN_TIDE_HEIGHT = 10.0; // Minimum high tide height in feet
+        const START_HOUR = 8; // 8 AM (inclusive)
+        const END_HOUR = 16; // 4 PM (exclusive)
+        const DAYS_TO_FETCH = 30; // Number of days of predictions to fetch
+        const EVENT_DURATION_MINUTES = 15; // Default duration for calendar events
+
+        // Schedule based on user's relative times from the image
+        const relativeSchedule = [
+            { label: "Put motor battery on charger", offset: "-1d" },
+            { label: "Confirm Dock floating, attach motor to dock transom", offset: "-1h" },
+            { label: "Pudgy loaded on trailer in driveway", offset: "-33m" },
+            { label: "Pudgy in water", offset: "-28m" },
+            { label: "Cast off", offset: "-3m" },
+            { label: "High Tide Target", offset: "0ms" }, // The reference point
+            { label: "In current", offset: "1m" },
+            { label: "Landed", offset: "6m" },
+            { label: "Connect Gangway", offset: "26m" },
+            { label: "50% done rolling out gangway", offset: "1h 14m" },
+            { label: "Float side connected", offset: "1h 28m" },
+            { label: "Ropes tied, trash cleaned up", offset: "1h 40m" },
+            { label: "Tractor in barn", offset: "1h 46m" }
+        ];
+
+        // --- DOM Elements ---
+        const statusDiv = document.getElementById('status');
+        const chartContainer = document.getElementById('chartContainer');
+        const suitableDatesDiv = document.getElementById('suitableDates');
+        const suitableDatesTitle = document.getElementById('suitableDatesTitle');
+        const datesList = document.getElementById('datesList');
+        const scheduleOutputDiv = document.getElementById('scheduleOutput');
+        const calendarLinkContainer = document.getElementById('calendarLinkContainer'); // Container for the .ics link
+        const scheduleList = document.getElementById('scheduleList');
+        const chartCanvas = document.getElementById('tideChart');
+        let tideChart = null;
+        let currentCalendarUrl = null; // To store object URL for cleanup
+
+        // --- Functions ---
+
+        /**
+         * Formats a date object into YYYYMMDD string for the NOAA API.
+         */
+        function formatDateYYYYMMDD(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}${month}${day}`;
+        }
+
+        /**
+         * Formats a JavaScript Date object into the UTC format required for iCalendar (YYYYMMDDTHHMMSSZ).
+         * @param {Date} date - The date object to format.
+         * @returns {string} The formatted date string.
+         */
+        function formatICSDate(date) {
+            const year = date.getUTCFullYear();
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            const hours = String(date.getUTCHours()).padStart(2, '0');
+            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+            return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+        }
+
+
+        /**
+         * Fetches tide predictions from the NOAA Tides and Currents API.
+         */
+        async function fetchTideData(startDateStr, endDateStr) {
+            const apiUrl = `https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?` +
+                           `begin_date=${startDateStr}&end_date=${endDateStr}&station=${TIDE_STATION_ID}` +
+                           `&product=predictions&datum=MLLW&units=english&time_zone=lst_ldt&format=json&interval=hilo`;
+            console.log("Fetching NOAA Tide Data from URL:", apiUrl);
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
+                const data = await response.json();
+                if (!data || !data.predictions) {
+                    const apiErrorMsg = data?.error?.message || "Invalid data format received.";
+                    throw new Error(`API Error: ${apiErrorMsg}`);
+                }
+                console.log(`Successfully fetched ${data.predictions.length} predictions.`);
+                return data.predictions;
+            } catch (error) {
+                console.error("Error fetching or processing tide data:", error);
+                statusDiv.textContent = `Error fetching tide data: ${error.message}. Check console.`;
+                statusDiv.className = 'status-message error';
+                return null;
+            }
+        }
+
+        /**
+         * Filters tide predictions to find high tides meeting the criteria.
+         */
+        function findSuitableTides(predictions) {
+            const suitableTides = [];
+            if (!Array.isArray(predictions)) return suitableTides;
+            predictions.forEach(pred => {
+                if (pred.type === 'H') {
+                    const tideHeight = parseFloat(pred.v);
+                    const tideDate = new Date(pred.t);
+                    if (!isNaN(tideHeight) && !isNaN(tideDate.getTime())) {
+                        const tideHour = tideDate.getHours();
+                        if (tideHeight > MIN_TIDE_HEIGHT && tideHour >= START_HOUR && tideHour < END_HOUR) {
+                            suitableTides.push({ date: tideDate, height: tideHeight });
+                        }
+                    }
+                }
+            });
+            console.log(`Found ${suitableTides.length} suitable tides.`);
+            return suitableTides;
+        }
+
+        /**
+         * Parses a relative time offset string and returns offset in milliseconds.
+         */
+        function parseRelativeOffset(offsetString) {
+            let totalMillis = 0;
+            const regex = /([+-]?\d+)\s*([dhms])/g;
+            let match;
+            while ((match = regex.exec(offsetString)) !== null) {
+                const value = parseInt(match[1], 10);
+                const unit = match[2];
+                switch (unit) {
+                    case 'd': totalMillis += value * 86400000; break; // 24 * 60 * 60 * 1000
+                    case 'h': totalMillis += value * 3600000; break;  // 60 * 60 * 1000
+                    case 'm': totalMillis += value * 60000; break;   // 60 * 1000
+                    case 's': totalMillis += value * (offsetString === "0ms" ? 1 : 1000); break;
+                }
+            }
+            return totalMillis;
+        }
+
+        /**
+         * Calculates the absolute schedule times based on a specific high tide event.
+         */
+        function calculateSchedule(highTideDate) {
+            const schedule = [];
+            const highTideMillis = highTideDate.getTime();
+            relativeSchedule.forEach(item => {
+                const offsetMillis = parseRelativeOffset(item.offset);
+                const itemTime = new Date(highTideMillis + offsetMillis);
+                schedule.push({ label: item.label, time: itemTime });
+            });
+            schedule.sort((a, b) => a.time - b.time);
+            return schedule;
+        }
+
+        /**
+         * Formats a Date object into a human-readable string for display.
+         */
+        function formatDisplayDateTime(date) {
+            return new Intl.DateTimeFormat('en-US', {
+                weekday: 'short', month: 'short', day: 'numeric',
+                hour: 'numeric', minute: '2-digit', hour12: true
+            }).format(date);
+        }
+
+        /**
+         * Generates the iCalendar (.ics) file content as a string.
+         * @param {Array} schedule - Array of schedule items { label: string, time: Date }.
+         * @param {Date} highTideDate - The reference high tide date.
+         * @returns {string} The .ics file content.
+         */
+        function generateICSContent(schedule, highTideDate) {
+            let icsString = `BEGIN:VCALENDAR\n`;
+            icsString += `VERSION:2.0\n`;
+            icsString += `PRODID:-//YourAppName//NewcastleDockSchedule//EN\n`; // Unique producer ID
+
+            const now = new Date();
+            const dtStamp = formatICSDate(now); // Timestamp for event creation
+
+            schedule.forEach((item, index) => {
+                const dtStart = item.time;
+                // Calculate end time (start time + duration)
+                const dtEnd = new Date(dtStart.getTime() + EVENT_DURATION_MINUTES * 60000);
+                // Create a unique ID for each event
+                const uid = `dockevent-${highTideDate.toISOString()}-${index}@example.com`; // Make UID unique
+
+                icsString += `BEGIN:VEVENT\n`;
+                icsString += `UID:${uid}\n`;
+                icsString += `DTSTAMP:${dtStamp}\n`;
+                icsString += `DTSTART:${formatICSDate(dtStart)}\n`;
+                icsString += `DTEND:${formatICSDate(dtEnd)}\n`;
+                icsString += `SUMMARY:${item.label}\n`;
+                // Optional: Add location
+                // icsString += `LOCATION:Newcastle Dock Area\n`;
+                icsString += `END:VEVENT\n`;
+            });
+
+            icsString += `END:VCALENDAR`;
+            return icsString;
+        }
+
+        /**
+         * Creates and displays the calendar download link.
+         * @param {string} icsContent - The generated .ics file content.
+         * @param {Date} highTideDate - The reference high tide date for filename.
+         */
+        function createCalendarLink(icsContent, highTideDate) {
+            // Clean up any previous object URL
+            if (currentCalendarUrl) {
+                URL.revokeObjectURL(currentCalendarUrl);
+                currentCalendarUrl = null;
+            }
+            // Clear previous link
+            calendarLinkContainer.innerHTML = '';
+
+            // Create a Blob (binary large object) with the ICS content
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            // Create a URL representing the Blob
+            currentCalendarUrl = URL.createObjectURL(blob);
+
+            // Create the download link element
+            const link = document.createElement('a');
+            link.id = 'calendarLink';
+            link.href = currentCalendarUrl;
+            // Suggest a filename for the download
+            const filenameDate = `${highTideDate.getFullYear()}${String(highTideDate.getMonth() + 1).padStart(2, '0')}${String(highTideDate.getDate()).padStart(2, '0')}`;
+            link.download = `dock_schedule_${filenameDate}.ics`;
+            link.textContent = 'Add Schedule to Calendar (.ics)';
+
+            // Append the link to its container
+            calendarLinkContainer.appendChild(link);
+            calendarLinkContainer.style.display = 'block'; // Ensure container is visible
+        }
+
+
+        /**
+         * Displays the calculated schedule and the calendar link in the UI.
+         * @param {Array} schedule - Array of schedule items from calculateSchedule.
+         * @param {Date} highTideDate - The high tide date this schedule is based on.
+         */
+        function displaySchedule(schedule, highTideDate) {
+            scheduleList.innerHTML = ''; // Clear previous schedule list items
+
+            // --- Create/Update Header ---
+            let header = scheduleOutputDiv.querySelector('h3');
+            if (!header) {
+                header = document.createElement('h3');
+                // Insert header before the calendar link container and list
+                scheduleOutputDiv.insertBefore(header, calendarLinkContainer);
+            }
+            header.textContent = `Calculated Schedule for High Tide on ${formatDisplayDateTime(highTideDate)}`;
+
+            // --- Generate and Display Calendar Link ---
+            const icsContent = generateICSContent(schedule, highTideDate);
+            createCalendarLink(icsContent, highTideDate);
+
+            // --- Populate Schedule List ---
+            schedule.forEach(item => {
+                const li = document.createElement('li');
+                const isHighTideReference = item.label === "High Tide Target";
+                li.innerHTML = `<strong>${formatDisplayDateTime(item.time)}:</strong> ${item.label}`;
+                if (isHighTideReference) {
+                    li.style.fontWeight = 'bold';
+                    li.style.backgroundColor = 'rgba(0, 123, 255, 0.05)';
+                }
+                scheduleList.appendChild(li);
+            });
+
+            scheduleOutputDiv.style.display = 'block';
+            // Scroll slightly above the schedule header for better context
+             header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        }
+
+        /**
+         * Creates and displays the tide chart using Chart.js.
+         */
+        function displayChart(predictions) {
+            if (!Array.isArray(predictions) || predictions.length === 0) {
+                 chartContainer.innerHTML = '<p class="status-message info">No tide prediction data available to display chart.</p>';
+                 chartContainer.style.display = 'block';
+                 return;
+            }
+            const ctx = chartCanvas.getContext('2d');
+            const chartData = predictions.map(p => ({ x: new Date(p.t).getTime(), y: parseFloat(p.v), type: p.type }));
+
+            if (tideChart) tideChart.destroy();
+
+            tideChart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: [{ label: 'Tide Height (ft MLLW)', data: chartData, borderColor: 'rgb(54, 162, 235)', backgroundColor: 'rgba(54, 162, 235, 0.1)', borderWidth: 1.5, tension: 0.1, pointRadius: 3, pointHoverRadius: 6, fill: true }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: {
+                        x: { type: 'time', time: { unit: 'day', tooltipFormat: 'PPpp', displayFormats: { day: 'MMM d' } }, title: { display: true, text: 'Date' }, grid: { display: false } },
+                        y: { beginAtZero: false, title: { display: true, text: 'Tide Height (ft)' }, grid: { color: '#eef2f5' } }
+                    },
+                    plugins: {
+                        tooltip: { callbacks: {
+                            title: (tooltipItems) => tooltipItems[0] ? formatDisplayDateTime(new Date(tooltipItems[0].parsed.x)) : '',
+                            label: (context) => { let l = context.dataset.label||''; if(l)l+=': '; const d=context.raw; if(d.y!==null){l+=d.y.toFixed(2)+' ft'; if(d.type)l+=` (${d.type==='H'?'High':'Low'} Tide)`;} return l; }
+                        }},
+                        legend: { display: false }
+                    },
+                    interaction: { mode: 'index', intersect: false },
+                }
+            });
+            chartContainer.style.display = 'block';
+        }
+
+        // --- Initialization ---
+        window.onload = async () => {
+            const today = new Date();
+            const endDate = new Date();
+            endDate.setDate(today.getDate() + DAYS_TO_FETCH);
+            const startDateStr = formatDateYYYYMMDD(today);
+            const endDateStr = formatDateYYYYMMDD(endDate);
+
+            statusDiv.textContent = 'Fetching tide data...';
+            statusDiv.className = 'status-message loader';
+
+            const predictions = await fetchTideData(startDateStr, endDateStr);
+
+            if (predictions) {
+                statusDiv.style.display = 'none';
+                displayChart(predictions);
+                const suitable = findSuitableTides(predictions);
+
+                suitableDatesTitle.textContent = `Suitable High Tides (> ${MIN_TIDE_HEIGHT} ft, ${START_HOUR} AM - ${END_HOUR === 12 ? 12 : END_HOUR % 12} PM)`;
+                datesList.innerHTML = '';
+
+                if (suitable.length > 0) {
+                    suitable.forEach(tide => {
+                        const li = document.createElement('li');
+                        const dateStr = formatDisplayDateTime(tide.date);
+                        li.innerHTML = `<span>${dateStr} - <strong>${tide.height.toFixed(2)} ft</strong></span> <button data-tide-time="${tide.date.toISOString()}">Generate Schedule</button>`;
+                        datesList.appendChild(li);
+                    });
+                    datesList.querySelectorAll('button').forEach(button => {
+                        button.addEventListener('click', (event) => {
+                            const selectedTideTimeStr = event.target.getAttribute('data-tide-time');
+                            const selectedHighTideDate = new Date(selectedTideTimeStr);
+                            const calculated = calculateSchedule(selectedHighTideDate);
+                            displaySchedule(calculated, selectedHighTideDate); // This now also creates the calendar link
+                        });
+                    });
+                    suitableDatesDiv.style.display = 'block';
+                } else {
+                    suitableDatesDiv.innerHTML = `<p class="status-message info">No suitable high tides (> ${MIN_TIDE_HEIGHT} ft between ${START_HOUR} AM and ${END_HOUR === 12 ? 12 : END_HOUR % 12} PM) found in the next 30 days.</p>`;
+                    suitableDatesDiv.style.display = 'block';
+                }
+            } else {
+                chartContainer.style.display = 'none';
+                suitableDatesDiv.style.display = 'none';
+                scheduleOutputDiv.style.display = 'none';
+            }
+        };
+    </script>
+</body>
+</html>
+
