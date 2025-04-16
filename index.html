@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Newcastle Dock Schedule Planner</title>
+    <title>Riverside Dock Springtime Scheduler</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <style>
@@ -175,7 +175,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>Newcastle Dock Schedule Planner</h1>
+        <h1>Riverside Dock Springtime Planner</h1>
 
         <div id="status" class="status-message loader">Loading tide data...</div>
 
@@ -209,16 +209,17 @@
         // Schedule based on user's relative times from the image
         const relativeSchedule = [
             { label: "Put motor battery on charger", offset: "-1d" },
+            { label: "Gather Life Vest, 300' of rope, PVC rollers, Levers, 2x4 blocks, motor, battery, anchor", offset: "-2h" },
             { label: "Confirm Dock floating, attach motor to dock transom", offset: "-1h" },
-            { label: "Pudgy loaded on trailer in driveway", offset: "-33m" },
-            { label: "Pudgy in water", offset: "-28m" },
-            { label: "Cast off", offset: "-3m" },
+            { label: "Load Pudgy on trailer in driveway", offset: "-33m" },
+            { label: "Launch Pudgy and run rope from launch to fixed dock", offset: "-28m" },
+            { label: "Cast off with the dock, using rope for guidance", offset: "-3m" },
             { label: "High Tide Target", offset: "0ms" }, // The reference point
-            { label: "In current", offset: "1m" },
-            { label: "Landed", offset: "6m" },
+            { label: "Enter current", offset: "1m" },
+            { label: "Land", offset: "6m" },
             { label: "Connect Gangway", offset: "26m" },
-            { label: "50% done rolling out gangway", offset: "1h 14m" },
-            { label: "Float side connected", offset: "1h 28m" },
+            { label: "Should be 50% done rolling out gangway", offset: "1h 14m" },
+            { label: "Float side should be connected", offset: "1h 28m" },
             { label: "Ropes tied, trash cleaned up", offset: "1h 40m" },
             { label: "Tractor in barn", offset: "1h 46m" }
         ];
